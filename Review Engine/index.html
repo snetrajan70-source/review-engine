@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>AI Review Discovery Engine</title>
+  <meta name="description" content="Analyze user feedback at scale to uncover discovery pain points, user goals, and opportunity areas. Transparent rule-based analysis with an optional bring-your-own LLM mode." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600&amp;display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       AI Review Discovery Engine — "Spectrum Booth · Bone Light"
+       Warm paper canvas, persimmon signal, oscilloscope grid.
+       Typeset entirely in Cormorant Garamond.
+       ============================================================ */
+    :root {
+      color-scheme: light;
+      --display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+
+      --bg-top: #f6f1e7;
+      --bg-bot: #ece4d4;
+      --grid: rgba(40, 32, 22, 0.045);
+
+      --panel: #fffdf8;
+      --panel-2: #f8f2e6;
+      --text: #1f1b14;
+      --mut: #756c5c;
+      --line: #ddd3c0;
+      --line-strong: #cfc2aa;
+      --track: #e6ddca;
+
+      --accent: #d8492a;     /* persimmon signal */
+      --accent-2: #a3361a;
+      --on-accent: #fffaf4;
+      --knob: #1f1b14;
+
+      --good: #2f7d4f;
+      --good-soft: #e3f1e7;
+      --danger: #a3261a;
+      --danger-soft: #fae7e0;
+      --danger-line: #e6b6a6;
+      --warn: #9a6b16;
+      --warn-soft: #f8ecd4;
+      --warn-line: #e6cf9e;
+
+      --radius: 12px;
+      --radius-sm: 8px;
+      --maxw: 1060px;
+    }
+    @media (prefers-color-scheme: dark) {
+      /* This screen is intentionally a light "bone" canvas; keep it light. */
+      :root { color-scheme: light; }
+    }
+
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; min-height: 100vh; position: relative;
+      font-family: var(--display); color: var(--text);
+      background: radial-gradient(1100px 480px at 50% -12%, #ffffff, transparent 60%), linear-gradient(180deg, var(--bg-top), var(--bg-bot) 65%, var(--bg-bot));
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; line-height: 1.5;
+    }
+    body::before {
+      content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 36px 36px, 36px 36px;
+    }
+    .wrap { position: relative; z-index: 1; max-width: var(--maxw); margin-inline: auto; padding-inline: clamp(18px, 4vw, 38px); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+    .vh { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+    /* tiny uppercase label utility (Cormorant, tracked) */
+    .lbl { font-size: 13.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--mut); }
+
+    /* ===================== Hero ===================== */
+    header.hero { padding-block: clamp(34px, 6vw, 70px) clamp(14px, 3vw, 26px); }
+    .kicker { font-size: 14.5px; font-weight: 600; letter-spacing: 0.3em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; }
+    .hero h1 { font-weight: 300; font-size: clamp(44px, 8.4vw, 92px); line-height: .92; letter-spacing: -0.012em; margin: 0; max-width: 15ch; }
+    .hero h1 em { font-style: italic; color: var(--accent); }
+    .hero .sub { font-size: clamp(18px, 2.6vw, 23px); color: var(--mut); max-width: 58ch; margin: 18px 0 0; line-height: 1.45; }
+    .sources { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 20px; }
+    .sources .lbl { margin-right: 4px; }
+    .chip { font-size: 15px; font-weight: 500; color: var(--text); background: var(--panel); border: 1px solid var(--line); padding: 3px 12px; border-radius: 999px; }
+
+    .hero-wave { display: flex; align-items: center; gap: 2px; height: 70px; margin-top: 26px; }
+    .hero-wave i { flex: 1 1 0; min-height: 3px; background: linear-gradient(to top, var(--accent-2), var(--accent)); border-radius: 2px; opacity: .9; }
+
+    /* ===================== Input panel ===================== */
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+    .input-card { padding: clamp(20px, 3vw, 30px); margin-bottom: 26px; }
+    .input-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+    .input-head h2 { font-size: clamp(24px, 3vw, 30px); font-weight: 500; margin: 0; }
+    .input-head .hint { font-size: 15px; color: var(--mut); font-style: italic; }
+
+    label.field-label { display: block; margin-bottom: 9px; }
+    textarea#reviews {
+      width: 100%; min-height: 215px; resize: vertical;
+      font-family: var(--display); font-size: 18px; font-weight: 500; line-height: 1.6; color: var(--text);
+      background: var(--panel-2); border: 1.5px solid var(--line-strong); border-radius: var(--radius-sm);
+      padding: 15px 16px; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    textarea#reviews::placeholder { color: var(--mut); opacity: .75; font-style: italic; }
+    textarea#reviews:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); background: var(--panel); }
+    textarea#reviews[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft); }
+
+    .status-row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-top: 13px; }
+    .meter { width: 150px; height: 6px; background: var(--track); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+    .meter > span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent-2), var(--accent)); transition: width .25s ease; }
+    .counter { font-size: 15px; color: var(--mut); letter-spacing: .01em; }
+    .counter b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .helper { font-size: 15.5px; color: var(--mut); min-height: 1.3em; margin: 10px 0 0; }
+    .helper.ok { color: var(--good); font-weight: 600; }
+    .helper.warn { color: var(--warn); font-weight: 600; }
+    .helper.bad { color: var(--danger); font-weight: 600; }
+
+    /* mode toggle */
+    .mode { margin: 18px 0 0; padding: 0; border: 0; }
+    .mode legend { padding: 0; margin-bottom: 9px; }
+    .seg { display: inline-flex; background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px; gap: 4px; flex-wrap: wrap; }
+    .seg label { position: relative; display: inline-flex; align-items: baseline; gap: 7px; font-size: 16px; font-weight: 600; color: var(--mut); padding: 7px 16px; border-radius: 999px; cursor: pointer; transition: all .15s ease; }
+    .seg label .tiny { font-size: 12.5px; font-weight: 500; font-style: italic; opacity: .85; }
+    .seg input { position: absolute; opacity: 0; pointer-events: none; }
+    .seg label:has(input:checked) { background: var(--accent); color: var(--on-accent); }
+    .seg label:has(input:checked) .tiny { color: var(--on-accent); opacity: .9; }
+    .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* AI config */
+    .ai-config { margin-top: 14px; padding: 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); background: var(--panel-2); }
+    .ai-config[hidden] { display: none; }
+    .ai-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; }
+    .ai-grid .full { grid-column: 1 / -1; }
+    .ai-config label { display: block; margin-bottom: 6px; }
+    .ai-config input {
+      width: 100%; font-family: var(--display); font-size: 16px; color: var(--text);
+      background: var(--panel); border: 1.5px solid var(--line-strong); border-radius: var(--radius-sm); padding: 9px 12px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .ai-config input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
+    .ai-note { margin: 12px 0 0; font-size: 14px; font-style: italic; color: var(--mut); line-height: 1.55; display: flex; gap: 8px; }
+    .ai-note b { font-style: normal; color: var(--text); }
+
+    /* buttons */
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+    .btn { appearance: none; font-family: var(--display); font-size: 17px; font-weight: 600; border-radius: var(--radius-sm); padding: 10px 20px; border: 1.5px solid transparent; cursor: pointer; transition: all .14s ease; display: inline-flex; align-items: center; gap: 8px; letter-spacing: .01em; }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 26%, transparent); }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-2); }
+    .btn-primary:disabled { cursor: not-allowed; opacity: .42; box-shadow: none; }
+    .btn-ghost { background: var(--panel); color: var(--text); border-color: var(--line-strong); }
+    .btn-ghost:hover { background: var(--panel-2); border-color: var(--accent); }
+    .btn-quiet { background: transparent; color: var(--mut); }
+    .btn-quiet:hover { background: var(--panel-2); color: var(--text); }
+    .spin { width: 15px; height: 15px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--on-accent) 45%, transparent); border-top-color: var(--on-accent); animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* error banner */
+    .error-banner { margin-top: 16px; display: none; gap: 12px; align-items: flex-start; background: var(--danger-soft); border: 1.5px solid var(--danger-line); border-left: 4px solid var(--danger); color: var(--danger); border-radius: var(--radius-sm); padding: 13px 15px; }
+    .error-banner.show { display: flex; }
+    .error-banner .ic { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; background: var(--danger); color: var(--panel); display: grid; place-items: center; font-weight: 700; font-size: 15px; margin-top: 2px; }
+    .error-banner .msg { font-size: 16px; line-height: 1.45; }
+    .error-banner .msg strong { display: block; font-size: 17px; font-weight: 600; }
+    .error-banner .msg span { color: color-mix(in srgb, var(--danger) 80%, var(--text)); font-weight: 500; }
+
+    /* ===================== Results ===================== */
+    .results { margin-bottom: 64px; }
+    .results[hidden] { display: none; }
+    .results-head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .results-head h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 400; margin: 0; }
+    .results-head h2 em { font-style: italic; color: var(--accent); }
+    .tag { font-size: 14px; font-weight: 600; letter-spacing: .04em; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); padding: 4px 12px; border-radius: 999px; }
+
+    /* transport bar (summary metrics, player metaphor) */
+    .transport { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1px solid var(--line); background: var(--panel); border-radius: var(--radius); margin-bottom: 16px; }
+    .play { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-size: 14px; }
+    .scrub { flex: 1; min-width: 70px; height: 4px; background: var(--track); border-radius: 3px; position: relative; }
+    .scrub .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--accent); border-radius: 3px; transition: width .5s ease; }
+    .scrub .knob { position: absolute; top: 50%; left: 0; width: 13px; height: 13px; background: var(--knob); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 3px var(--panel); transition: left .5s ease; }
+    .t-stats { font-size: 17px; color: var(--mut); white-space: nowrap; letter-spacing: .01em; }
+    .t-stats b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .notice { border-radius: var(--radius-sm); padding: 11px 14px; font-size: 15px; line-height: 1.5; display: flex; gap: 9px; align-items: flex-start; margin-bottom: 14px; }
+    .notice[hidden] { display: none; }
+    .notice.clean { background: var(--panel); border: 1px solid var(--line); color: var(--mut); }
+    .notice.sample, .notice.fallback { background: var(--warn-soft); border: 1px solid var(--warn-line); color: var(--warn); font-weight: 500; }
+    .notice b { color: var(--text); font-weight: 600; }
+    .notice.sample b, .notice.fallback b { color: var(--warn); }
+    .summary-line { font-size: 17px; color: var(--text); background: var(--good-soft); border: 1px solid color-mix(in srgb, var(--good) 26%, transparent); border-radius: var(--radius-sm); padding: 12px 15px; margin-bottom: 14px; font-style: italic; }
+    .summary-line[hidden] { display: none; }
+    .summary-line b { font-style: normal; }
+
+    .grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(18px, 2.6vw, 26px); }
+    .span-2 { grid-column: 1 / -1; }
+    .panel-title { font-size: clamp(24px, 3vw, 30px); font-weight: 500; margin: 0 0 2px; }
+    .panel-sub { font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--mut); margin: 0 0 18px; }
+
+    /* theme queue (mini-EQ rows) */
+    .q { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line); }
+    .q:first-of-type { border-top: 0; padding-top: 2px; }
+    .eq { display: flex; align-items: flex-end; gap: 2px; width: 52px; height: 32px; flex: 0 0 auto; }
+    .eq i { flex: 1; background: var(--accent); border-radius: 1px; opacity: .92; }
+    .q-main { flex: 1; min-width: 0; }
+    .q-name { font-size: 22px; line-height: 1.15; display: inline; }
+    .q-sub { font-size: 13.5px; font-style: italic; color: var(--mut); margin-top: 1px; }
+    .q-meta { font-size: 16px; color: var(--mut); white-space: nowrap; letter-spacing: .01em; text-align: end; }
+    .q-meta b { color: var(--text); font-weight: 600; }
+    .pol { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; padding: 1px 8px; border-radius: 999px; margin-left: 9px; white-space: nowrap; vertical-align: middle; }
+    .pol.pain { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-line); }
+    .pol.praise { background: var(--good-soft); color: var(--good); border: 1px solid color-mix(in srgb, var(--good) 30%, transparent); }
+    .pol.neutral { background: var(--panel-2); color: var(--mut); border: 1px solid var(--line); }
+
+    .bright { margin-top: 14px; font-size: 15px; font-style: italic; color: var(--text); background: var(--good-soft); border: 1px solid color-mix(in srgb, var(--good) 24%, transparent); border-radius: var(--radius-sm); padding: 9px 13px; }
+    .bright[hidden] { display: none; }
+    .bright b { font-style: normal; color: var(--good); }
+
+    /* lists (goals / pains / opps / other) */
+    ul.list { list-style: none; margin: 0; padding: 0; }
+    ul.list li { display: flex; gap: 13px; align-items: flex-start; padding: 13px 0; border-top: 1px solid var(--line); }
+    ul.list li:first-child { border-top: 0; padding-top: 2px; }
+    ul.list .ic { flex: 0 0 auto; margin-top: 4px; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--accent); }
+    ul.list .ic.good { background: var(--good-soft); color: var(--good); }
+    ul.list .ic.warn { background: var(--warn-soft); color: var(--warn); }
+    ul.list .body { flex: 1 1 auto; min-width: 0; }
+    ul.list .t { font-size: 20px; font-weight: 500; line-height: 1.2; }
+    ul.list .d { font-size: 14.5px; color: var(--mut); margin-top: 2px; line-height: 1.5; }
+    .badge { font-size: 12.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--panel-2); color: var(--mut); border: 1px solid var(--line); white-space: nowrap; margin-inline-start: auto; align-self: center; }
+    .badge.strong { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 26%, transparent); }
+    .badge.mod { background: var(--good-soft); color: var(--good); border-color: color-mix(in srgb, var(--good) 24%, transparent); }
+
+    /* segments (signal bars) */
+    .seg-row { padding: 14px 0; border-top: 1px solid var(--line); }
+    .seg-row:first-of-type { border-top: 0; padding-top: 2px; }
+    .seg-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; gap: 12px; }
+    .seg-top .n { font-size: 20px; font-weight: 500; }
+    .seg-top .p { font-size: 16px; color: var(--accent); font-weight: 600; white-space: nowrap; }
+    .seg-desc { font-size: 13.5px; font-style: italic; color: var(--mut); margin: -4px 0 8px; }
+    .sbar { height: 6px; background: var(--track); border-radius: 3px; overflow: hidden; }
+    .sbar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); border-radius: 3px; transition: width .55s cubic-bezier(.2,.7,.2,1); }
+    .seg-note { font-size: 13.5px; font-style: italic; color: var(--mut); margin-top: 12px; }
+
+    .empty-note { font-size: 15px; font-style: italic; color: var(--mut); background: var(--panel-2); border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 11px 14px; }
+
+    .disclaimer { margin-top: 18px; font-size: 14.5px; color: var(--mut); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 15px; display: flex; gap: 9px; align-items: flex-start; line-height: 1.55; }
+    .disclaimer b { color: var(--text); }
+
+    footer.foot { padding-block: 24px 44px; text-align: center; color: var(--mut); font-size: 14.5px; font-style: italic; }
+
+    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 560px) {
+      .ai-grid { grid-template-columns: 1fr; }
+      .actions .btn { flex: 1 1 auto; justify-content: center; }
+      .q-name { display: block; }
+      .pol { margin-left: 0; margin-top: 4px; display: inline-block; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, .spin { transition: none !important; animation: none !important; } }
+  </style>
+
+  <!-- Vercel Web Analytics -->
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- ===================== Hero ===================== -->
+    <header class="hero">
+      <p class="kicker">Now analyzing // frequency view</p>
+      <h1>AI Review <em>Discovery</em> Engine</h1>
+      <p class="sub">Analyze user feedback at scale to uncover discovery pain points, user goals, and opportunity areas.</p>
+      <div class="sources">
+        <span class="lbl">Sources</span>
+        <span class="chip">App Store</span>
+        <span class="chip">Play Store</span>
+        <span class="chip">Reddit</span>
+        <span class="chip">Community forums</span>
+        <span class="chip">Social comments</span>
+      </div>
+      <div class="hero-wave" id="hero-wave" aria-hidden="true"></div>
+    </header>
+
+    <main>
+      <!-- ===================== Input ===================== -->
+      <section class="panel input-card" aria-labelledby="input-title">
+        <div class="input-head">
+          <h2 id="input-title">Paste customer reviews</h2>
+          <span class="hint">One review per line, or separate with a blank line</span>
+        </div>
+
+        <label class="field-label lbl" for="reviews">User reviews</label>
+        <textarea id="reviews" name="reviews" aria-describedby="helper counter"
+          placeholder="The recommendations are so repetitive — I keep hearing the same songs and same artists over and over.&#10;&#10;Discovery takes too much effort. I have to search manually to find anything new, and it's hard to find hidden gems.&#10;&#10;My daily mix is basically the same playlist every day. I'm bored of it and nothing fresh ever shows up."></textarea>
+
+        <div class="status-row">
+          <span class="meter" aria-hidden="true"><span id="meter-fill"></span></span>
+          <span class="counter" id="counter"><b id="word-count">0</b> / 50 meaningful words &middot; <b id="total-words">0</b> total</span>
+        </div>
+        <p class="helper" id="helper" role="status" aria-live="polite">Paste at least 50 meaningful words of reviews, or press Run Demo.</p>
+
+        <fieldset class="mode">
+          <legend class="lbl">Analysis mode</legend>
+          <div class="seg" role="radiogroup" aria-label="Analysis mode">
+            <label><input type="radio" name="mode" value="keyword" checked /> <span>Keyword</span><span class="tiny">transparent</span></label>
+            <label><input type="radio" name="mode" value="ai" aria-controls="ai-config" /> <span>AI</span><span class="tiny">emergent themes</span></label>
+          </div>
+        </fieldset>
+
+        <div class="ai-config" id="ai-config" hidden>
+          <div class="ai-grid">
+            <div class="full">
+              <label class="lbl" for="ai-endpoint">API endpoint — optional override</label>
+              <input id="ai-endpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" value="https://openrouter.ai/api/v1/chat/completions" placeholder="https://openrouter.ai/api/v1/chat/completions" />
+            </div>
+            <div>
+              <label class="lbl" for="ai-model">Model — free models recommended</label>
+              <input id="ai-model" type="text" autocomplete="off" spellcheck="false" value="meta-llama/llama-3.3-70b-instruct:free" placeholder="meta-llama/llama-3.3-70b-instruct:free" />
+            </div>
+            <div>
+              <label class="lbl" for="ai-key">API key — optional</label>
+              <input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="leave blank — uses the server key" />
+            </div>
+          </div>
+          <p class="ai-note"><span aria-hidden="true">🔒</span> <span><b>No key needed.</b> AI mode runs through a secure server proxy — the OpenRouter key is configured once on the server (as an environment variable) and never appears in this page, so anyone can use AI mode without entering anything. <b>Advanced:</b> to use your own provider/model instead, paste an OpenAI-compatible endpoint, model, and key above — those stay in this browser only. If a model rejects JSON mode the request auto-retries; if the AI service is unreachable, the app falls back to the transparent keyword engine.</span></p>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btn-analyze" disabled aria-disabled="true">Analyze Reviews</button>
+          <button type="button" class="btn btn-ghost" id="btn-demo">Run Demo</button>
+          <button type="button" class="btn btn-quiet" id="btn-clear">Clear</button>
+        </div>
+
+        <div class="error-banner" id="error-banner" role="alert" aria-live="assertive">
+          <span class="ic" aria-hidden="true">!</span>
+          <span class="msg"><strong id="error-title">Something needs fixing</strong><span id="error-detail"></span></span>
+        </div>
+      </section>
+
+      <!-- ===================== Results ===================== -->
+      <section class="results" id="results" hidden aria-labelledby="results-title" aria-live="polite">
+        <div class="results-head">
+          <h2 id="results-title">Discovery <em>insights</em></h2>
+          <span class="tag" id="results-tag">Prototype analysis · rule-based</span>
+        </div>
+
+        <div class="transport" aria-label="Summary">
+          <span class="play" aria-hidden="true">&#9654;</span>
+          <span class="scrub" aria-hidden="true"><span class="fill" id="scrub-fill"></span><span class="knob" id="scrub-knob"></span></span>
+          <span class="t-stats" id="t-stats"></span>
+        </div>
+
+        <div class="notice fallback" id="fallback-note" role="status" hidden></div>
+        <div class="summary-line" id="summary-line" hidden></div>
+        <div class="notice clean" id="clean-note"></div>
+        <div class="notice sample" id="sample-note" hidden></div>
+
+        <div class="grid">
+          <article class="card span-2" aria-labelledby="p-themes">
+            <h3 class="panel-title" id="p-themes">Theme queue</h3>
+            <p class="panel-sub" id="themes-sub">Top themes · share of analysed reviews</p>
+            <div id="queue"></div>
+            <div class="bright" id="bright-note" hidden></div>
+          </article>
+
+          <article class="card" aria-labelledby="p-goals">
+            <h3 class="panel-title" id="p-goals">User goals</h3>
+            <p class="panel-sub">What listeners are trying to achieve</p>
+            <ul class="list" id="goals-body"></ul>
+          </article>
+
+          <article class="card" aria-labelledby="p-pains">
+            <h3 class="panel-title" id="p-pains">Pain points</h3>
+            <p class="panel-sub">Negative-sentiment friction only</p>
+            <ul class="list" id="pains-body"></ul>
+          </article>
+
+          <article class="card" aria-labelledby="p-segs">
+            <h3 class="panel-title" id="p-segs">Segments</h3>
+            <p class="panel-sub">Signal share — not % of listeners</p>
+            <div id="segs-body"></div>
+          </article>
+
+          <article class="card" aria-labelledby="p-opps">
+            <h3 class="panel-title" id="p-opps">Opportunity areas</h3>
+            <p class="panel-sub">Where the product can win</p>
+            <ul class="list" id="opps-body"></ul>
+          </article>
+
+          <article class="card span-2" aria-labelledby="p-other">
+            <h3 class="panel-title" id="p-other">Other &amp; off-thesis</h3>
+            <p class="panel-sub">Feedback outside the discovery thesis — guards against confirmation bias</p>
+            <ul class="list" id="other-body"></ul>
+          </article>
+        </div>
+
+        <div class="disclaimer"><span aria-hidden="true">ℹ️</span> <span id="disclaimer-text"></span></div>
+
+        <div class="actions" style="margin-top:18px;">
+          <button type="button" class="btn btn-ghost" id="btn-download">⬇ Download insights as text</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">AI Review Discovery Engine · front-end prototype · keyword mode runs locally; AI mode calls the endpoint you configure.</footer>
+  </div>
+
+  <script>
+  "use strict";
+
+  /* ================================================================
+     Two engines behind one UI:
+       • Keyword — transparent, deterministic, local. Word-boundary
+         matching + negation + per-review sentiment, with an off-thesis
+         and uncategorised bucket so it can't only ever "find" a
+         discovery problem.
+       • AI — bring-your-own OpenAI-compatible endpoint for EMERGENT
+         themes; falls back to keyword if unconfigured or on error.
+     Shared real clean/dedup step (exact-duplicate + non-Latin flag).
+     ================================================================ */
+
+  const els = {
+    heroWave:   document.getElementById("hero-wave"),
+    textarea:   document.getElementById("reviews"),
+    wordCount:  document.getElementById("word-count"),
+    totalWords: document.getElementById("total-words"),
+    meterFill:  document.getElementById("meter-fill"),
+    helper:     document.getElementById("helper"),
+    analyze:    document.getElementById("btn-analyze"),
+    demo:       document.getElementById("btn-demo"),
+    clear:      document.getElementById("btn-clear"),
+    download:   document.getElementById("btn-download"),
+    errorBanner:document.getElementById("error-banner"),
+    errorTitle: document.getElementById("error-title"),
+    errorDetail:document.getElementById("error-detail"),
+    aiConfig:   document.getElementById("ai-config"),
+    aiEndpoint: document.getElementById("ai-endpoint"),
+    aiModel:    document.getElementById("ai-model"),
+    aiKey:      document.getElementById("ai-key"),
+    results:    document.getElementById("results"),
+    tag:        document.getElementById("results-tag"),
+    scrubFill:  document.getElementById("scrub-fill"),
+    scrubKnob:  document.getElementById("scrub-knob"),
+    tStats:     document.getElementById("t-stats"),
+    fallback:   document.getElementById("fallback-note"),
+    summaryLine:document.getElementById("summary-line"),
+    cleanNote:  document.getElementById("clean-note"),
+    sampleNote: document.getElementById("sample-note"),
+    queue:      document.getElementById("queue"),
+    themesSub:  document.getElementById("themes-sub"),
+    bright:     document.getElementById("bright-note"),
+    goalsBody:  document.getElementById("goals-body"),
+    painsBody:  document.getElementById("pains-body"),
+    segsBody:   document.getElementById("segs-body"),
+    oppsBody:   document.getElementById("opps-body"),
+    otherBody:  document.getElementById("other-body"),
+    disclaimer: document.getElementById("disclaimer-text"),
+  };
+
+  const MIN_WORDS = 50;
+  const SMALL_SAMPLE = 30;
+  let lastAnalysis = null;
+
+  /* ---- Knowledge base ---- */
+  const THEMES = [
+    { id: "repetitive", name: "Repetitive recommendations",
+      keywords: ["same song", "same songs", "same artist", "same artists", "repetitive", "repeated", "repeat", "over and over", "predictable", "stale", "same music", "same tracks"],
+      pain: "The same songs and artists keep resurfacing, so recommendations feel predictable.",
+      opp: { title: "Reduce repetition in mixes", desc: "Add freshness controls and de-dupe rules so daily mixes rotate beyond recently played tracks." } },
+    { id: "discovery-effort", name: "Discovery takes effort",
+      keywords: ["hard to discover", "difficult to find", "hard to find", "cant find", "can't find", "search manually", "manually", "effort", "takes effort", "takes time to find", "have to search", "have to dig"],
+      pain: "Finding new music requires manual searching instead of being surfaced automatically.",
+      opp: { title: "Guided discovery journeys", desc: "Introduce low-effort, one-tap discovery paths that surface fresh tracks without manual searching." } },
+    { id: "mood-mismatch", name: "Mood / context mismatch",
+      keywords: ["wrong vibe", "wrong mood", "doesnt match", "doesn't match", "does not match", "match my mood", "mood", "vibe", "workout", "work out", "gym", "study", "studying", "commute", "focus", "sleep", "running"],
+      pain: "Recommendations don't adapt to what the listener is doing or the mood they want.",
+      opp: { title: "Mood-aware recommendations", desc: "Personalize by activity and context (workout, study, commute) so the right vibe surfaces automatically." } },
+    { id: "mainstream", name: "Mainstream bias",
+      keywords: ["mainstream", "popular songs only", "only popular", "popular only", "trending", "top charts", "charts", "only hits", "same popular", "overplayed"],
+      pain: "Suggestions skew toward mainstream, trending, and chart hits at the expense of variety.",
+      opp: { title: "Diversify beyond the mainstream", desc: "Blend long-tail, underrated, and niche tracks into recommendations instead of leaning on the charts." } },
+    { id: "stagnation", name: "Playlist stagnation",
+      keywords: ["same playlist", "old playlist", "daily mix repeats", "bored", "boring", "stagnant", "nothing new", "never changes", "feels old", "tired of"],
+      pain: "Playlists and daily mixes feel static — listeners get bored because little changes.",
+      opp: { title: "Keep playlists alive", desc: "Auto-refresh playlists on a cadence and signal what's new so the library never feels frozen." } },
+    { id: "novelty", name: "Desire for novelty",
+      keywords: ["fresh", "freshness", "new music", "novelty", "novel", "hidden gem", "hidden gems", "underrated", "discover", "discovery", "variety", "something different", "explore", "diverse"],
+      pain: "Listeners actively want fresh, novel, and varied music but aren't getting enough of it.",
+      opp: { title: "Introduce guided novelty", desc: "Add adjustable novelty / variety controls and a 'fresh finds' surface to satisfy explorers." } }
+  ];
+  const OFFTHESIS = [
+    { id: "pricing", name: "Pricing & subscription", desc: "Cost, value, premium, or refund complaints.", keywords: ["price", "pricing", "expensive", "too expensive", "cost", "subscription", "premium", "paywall", "free trial", "refund", "overpriced", "not worth"] },
+    { id: "ads", name: "Ads & interruptions", desc: "Advertising volume or interruptions.", keywords: ["ads", "advert", "adverts", "advertisement", "advertisements", "commercial", "commercials", "too many ads", "interrupt", "interruptions"] },
+    { id: "bugs", name: "Bugs & crashes", desc: "Crashes, freezes, and broken behavior.", keywords: ["bug", "bugs", "crash", "crashes", "crashing", "freeze", "frozen", "glitch", "broken", "error", "force close", "wont open", "won't open"] },
+    { id: "account", name: "Account & login", desc: "Sign-in, password, or account issues.", keywords: ["login", "log in", "sign in", "account", "password", "locked out", "cant log", "can't log", "verification"] },
+    { id: "performance", name: "Performance", desc: "Speed, lag, buffering, battery, or data.", keywords: ["slow", "lag", "laggy", "loading", "buffer", "buffering", "battery", "data usage"] },
+    { id: "audio", name: "Audio quality", desc: "Sound quality and bitrate complaints.", keywords: ["sound quality", "audio quality", "bitrate", "low quality", "distorted", "muffled"] }
+  ];
+  const GOALS = [
+    { title: "Discover fresh new music", desc: "Surface tracks the listener hasn't heard before.", themes: ["novelty", "discovery-effort", "stagnation"] },
+    { title: "Match mood & activity", desc: "Right music for workout, study, commute, focus.", themes: ["mood-mismatch"] },
+    { title: "Effortless, lean-back listening", desc: "Great discovery without manual searching.", themes: ["discovery-effort", "stagnation"] },
+    { title: "More variety in the mix", desc: "Break out of repetitive, predictable loops.", themes: ["repetitive", "mainstream", "stagnation"] },
+    { title: "Find hidden gems", desc: "Go beyond mainstream and chart hits.", themes: ["novelty", "mainstream"] }
+  ];
+  const SEGMENTS = [
+    { id: "mood", name: "Mood-based listeners", desc: "Choose music by feeling, moment, and activity.", keywords: ["mood", "vibe", "workout", "work out", "gym", "study", "commute", "focus", "sleep", "relax", "running", "chill"] },
+    { id: "passive", name: "Passive listeners", desc: "Want effortless playback that just works.", keywords: ["effort", "manually", "lean back", "just play", "just want", "background", "set and forget", "without thinking"] },
+    { id: "explorer", name: "Music explorers", desc: "Actively seek fresh, novel, and niche tracks.", keywords: ["discover", "discovery", "explore", "new music", "fresh", "hidden gem", "hidden gems", "underrated", "variety", "novelty", "something different"] }
+  ];
+  const POS = ["love", "loved", "great", "awesome", "amazing", "perfect", "excellent", "nice", "good", "best", "fantastic", "glad", "wonderful", "brilliant", "enjoy", "enjoying", "favorite", "favourite", "impressed"];
+  const NEG = ["hate", "annoying", "frustrat", "terrible", "awful", "worst", "poor", "bored", "boring", "stale", "disappoint", "useless", "broken", "tired of", "sick of", "wrong", "fails", "fail", "ugh"];
+  const NEGATORS = ["not", "never", "no", "without", "hardly", "barely", "cannot", "cant", "dont", "doesnt", "didnt", "isnt", "arent", "wasnt", "werent", "aint", "nor", "none"];
+
+  /* ---- Helpers ---- */
+  function getMeaningfulWordCount(text) {
+    if (!text) return 0;
+    let count = 0;
+    for (const tok of text.split(/\s+/)) { if (tok.replace(/[^a-zA-ZÀ-ɏ]/g, "").length >= 2) count++; }
+    return count;
+  }
+  function getTotalWordCount(text) { return (!text || !text.trim()) ? 0 : text.trim().split(/\s+/).length; }
+  function isOnlyNumbersOrSymbols(text) {
+    if (!text || !text.trim()) return false;
+    return getMeaningfulWordCount(text) === 0;
+  }
+  function isNegated(text, idx) {
+    const before = text.slice(Math.max(0, idx - 32), idx);
+    const words = before.toLowerCase().replace(/[^a-z']/g, " ").split(/\s+/).filter(Boolean);
+    return words.slice(-3).some(w => NEGATORS.includes(w.replace(/'/g, "")));
+  }
+  function themeMatchCount(lower, keywords) {
+    let hits = 0;
+    for (const kw of keywords) {
+      const safe = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp("(^|[^a-z])(" + safe + ")(?![a-z])", "g");
+      let m;
+      while ((m = re.exec(lower)) !== null) {
+        const start = m.index + m[1].length;
+        if (!isNegated(lower, start)) hits++;
+        if (m.index === re.lastIndex) re.lastIndex++;
+      }
+    }
+    return hits;
+  }
+  function reviewPolarity(lower) {
+    let pos = 0, neg = 0;
+    for (const w of POS) if (lower.indexOf(w) !== -1) pos++;
+    for (const w of NEG) if (lower.indexOf(w) !== -1) neg++;
+    if (pos > neg) return "praise";
+    if (neg > pos) return "pain";
+    return "neutral";
+  }
+  function cleanInput(text) {
+    let blocks = /\n\s*\n/.test(text) ? text.split(/\n\s*\n+/) : text.split(/\n+/);
+    blocks = blocks.map(b => b.trim()).filter(Boolean);
+    const seen = new Set();
+    let duplicatesRemoved = 0, nonLatinFlagged = 0;
+    const reviews = [];
+    for (const b of blocks) {
+      const letters = (b.match(/\p{L}/gu) || []).length;
+      if (letters === 0) continue;
+      const norm = b.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() || b.toLowerCase();
+      if (seen.has(norm)) { duplicatesRemoved++; continue; }
+      seen.add(norm);
+      const latin = (b.match(/[a-z]/gi) || []).length;
+      const isNonLatin = letters > 0 && (latin / letters) < 0.4;
+      if (isNonLatin) nonLatinFlagged++;
+      reviews.push({ raw: b, lower: b.toLowerCase(), isNonLatin });
+    }
+    const analysed = reviews.filter(r => !r.isNonLatin);
+    return { reviews, analysed, detectedCount: reviews.length, duplicatesRemoved, nonLatinFlagged };
+  }
+
+  /* ---- Validation ---- */
+  function validateInput(text) {
+    const raw = text || "";
+    const words = getMeaningfulWordCount(raw);
+    if (!raw.trim()) return { valid: false, code: "empty", words, message: "Nothing to analyze yet", detail: "Please paste reviews before analyzing, or click Run Demo." };
+    if (isOnlyNumbersOrSymbols(raw)) return { valid: false, code: "symbols", words, message: "Invalid input", detail: "Please enter actual user reviews, not only numbers or special characters." };
+    if (words < MIN_WORDS) return { valid: false, code: "short", words, message: "Too short to analyze", detail: "Please paste at least 50 meaningful words of user reviews. You currently have " + words + " meaningful word" + (words === 1 ? "" : "s") + "." };
+    return { valid: true, code: "ok", words, message: "", detail: "" };
+  }
+
+  /* ---- Error / visibility ---- */
+  function showError(title, detail) {
+    hideResults();
+    els.errorTitle.textContent = title;
+    els.errorDetail.textContent = detail;
+    els.errorBanner.classList.add("show");
+    els.textarea.setAttribute("aria-invalid", "true");
+  }
+  function hideError() {
+    els.errorBanner.classList.remove("show");
+    els.errorDetail.textContent = "";
+    els.textarea.setAttribute("aria-invalid", "false");
+  }
+  function hideResults() { els.results.hidden = true; }
+
+  /* ---- Live status ---- */
+  function updateLiveStatus() {
+    const text = els.textarea.value;
+    const words = getMeaningfulWordCount(text);
+    const v = validateInput(text);
+    els.wordCount.textContent = String(words);
+    els.totalWords.textContent = String(getTotalWordCount(text));
+    els.meterFill.style.width = Math.max(0, Math.min(100, Math.round((words / MIN_WORDS) * 100))) + "%";
+    els.helper.classList.remove("ok", "warn", "bad");
+    if (v.code === "empty") {
+      els.helper.textContent = "Paste at least 50 meaningful words of reviews, or press Run Demo.";
+    } else if (v.code === "symbols") {
+      els.helper.textContent = "Looks like only numbers or symbols — add real review text to continue.";
+      els.helper.classList.add("bad");
+    } else if (v.code === "short") {
+      els.helper.textContent = words + " / 50 meaningful words — add " + (MIN_WORDS - words) + " more to enable analysis.";
+      els.helper.classList.add("warn");
+    } else {
+      els.helper.textContent = "✓ Ready to analyze — " + words + " meaningful words detected.";
+      els.helper.classList.add("ok");
+    }
+    els.analyze.disabled = !v.valid;
+    els.analyze.setAttribute("aria-disabled", String(!v.valid));
+  }
+
+  /* ---- Keyword engine ---- */
+  function analyzeKeyword(text) {
+    const c = cleanInput(text);
+    const totalWords = getTotalWordCount(text);
+    const themeAgg = THEMES.map(t => ({ id: t.id, name: t.name, pain: t.pain, opp: t.opp, mentions: 0, painM: 0, praiseM: 0, hits: 0 }));
+    const offAgg = OFFTHESIS.map(o => ({ id: o.id, name: o.name, desc: o.desc, mentions: 0, hits: 0 }));
+    const segAgg = SEGMENTS.map(s => ({ id: s.id, name: s.name, desc: s.desc, hits: 0 }));
+    let categorised = 0, uncategorised = 0;
+
+    for (const r of c.analysed) {
+      const pol = reviewPolarity(r.lower);
+      let hitTheme = false, hitOff = false;
+      themeAgg.forEach((agg, i) => {
+        const cnt = themeMatchCount(r.lower, THEMES[i].keywords);
+        if (cnt > 0) { hitTheme = true; agg.mentions++; agg.hits += cnt; if (pol === "praise") agg.praiseM++; else agg.painM++; }
+      });
+      offAgg.forEach((agg, i) => { const cnt = themeMatchCount(r.lower, OFFTHESIS[i].keywords); if (cnt > 0) { hitOff = true; agg.mentions++; agg.hits += cnt; } });
+      segAgg.forEach((agg, i) => { agg.hits += themeMatchCount(r.lower, SEGMENTS[i].keywords); });
+      if (hitTheme || hitOff) categorised++; else uncategorised++;
+    }
+
+    const denom = Math.max(1, c.analysed.length);
+    const themes = themeAgg.filter(t => t.mentions > 0).sort((a, b) => b.mentions - a.mentions || b.hits - a.hits);
+    themes.forEach(t => { t.share = Math.round((t.mentions / denom) * 100); t.polarity = t.praiseM > t.painM ? "praise" : (t.painM > 0 ? "pain" : "neutral"); });
+    const other = offAgg.filter(o => o.mentions > 0).sort((a, b) => b.mentions - a.mentions);
+    other.forEach(o => { o.share = Math.round((o.mentions / denom) * 100); });
+    const active = new Set(themes.map(t => t.id));
+    const goals = GOALS.map(g => {
+      const support = g.themes.filter(id => active.has(id));
+      const strength = support.reduce((s, id) => { const th = themes.find(t => t.id === id); return s + (th ? th.hits : 0); }, 0);
+      return { title: g.title, desc: g.desc, support, strength };
+    }).filter(g => g.support.length > 0).sort((a, b) => b.strength - a.strength);
+    const segTotal = segAgg.reduce((s, x) => s + x.hits, 0);
+    segAgg.forEach(s => { s.share = segTotal ? Math.round((s.hits / segTotal) * 100) : 0; });
+    const segments = segAgg.filter(s => s.hits > 0).sort((a, b) => b.hits - a.hits);
+    const pains = themes.filter(t => t.painM > 0).slice(0, 6).map(t => ({ title: t.name, desc: t.pain, mentions: t.painM }));
+    const opps = themes.slice(0, 6).map(t => ({ title: t.opp.title, desc: t.opp.desc }));
+    const praise = themes.filter(t => t.polarity === "praise").map(t => t.name);
+
+    return {
+      mode: "keyword",
+      reviewCount: c.detectedCount, analysedCount: c.analysed.length, totalWords,
+      duplicatesRemoved: c.duplicatesRemoved, nonLatinFlagged: c.nonLatinFlagged,
+      categorised, uncategorised,
+      smallSample: c.analysed.length > 0 && c.analysed.length < SMALL_SAMPLE,
+      themes, goals, pains, segments, opps, other, praise, summary: null, fallbackNote: null
+    };
+  }
+
+  /* ---- AI engine ---- */
+  function currentMode() { const r = document.querySelector('input[name="mode"]:checked'); return r ? r.value : "keyword"; }
+  function getAIConfig() { return { endpoint: els.aiEndpoint.value.trim(), model: els.aiModel.value.trim(), key: els.aiKey.value.trim() }; }
+  function aiConfigured(cfg) { return !!(cfg.endpoint && cfg.model && cfg.key); }
+
+  const AI_SYSTEM = "You are a senior product analyst for a music streaming app. You analyze raw user reviews and surface EMERGENT themes grounded only in the text provided. Do not invent feedback. Detect sentiment so praise is not reported as a pain point. Capture issues that fall OUTSIDE music discovery (pricing, ads, bugs, account, performance, audio quality, or anything else) in an 'other' array so nothing is forced into a discovery narrative. Respond with a single JSON object only.";
+  function aiUserPrompt(text) {
+    return [
+      "Analyze the reviews below and return ONLY this JSON shape:",
+      "{",
+      '  "summary": "1-2 sentence neutral overview",',
+      '  "themes": [{"name": "...", "type": "pain|praise|neutral", "mentions": <int>, "evidence": "short paraphrase"}],',
+      '  "goals": [{"title": "...", "desc": "..."}],',
+      '  "painPoints": [{"title": "...", "desc": "..."}],',
+      '  "segments": [{"name": "...", "share": <int 0-100>, "desc": "..."}],',
+      '  "opportunities": [{"title": "...", "desc": "..."}],',
+      '  "other": [{"name": "...", "mentions": <int>, "desc": "off-thesis / emergent issue"}]',
+      "}",
+      "Rules: themes must be emergent (not from a fixed list); mentions = number of reviews; shares are directional signal share, not population percentages; put non-discovery feedback in 'other'.",
+      "", "REVIEWS:", text
+    ].join("\n");
+  }
+  function parseJSONLoose(s) {
+    try { return JSON.parse(s); } catch (e) {}
+    const a = s.indexOf("{"), b = s.lastIndexOf("}");
+    if (a !== -1 && b !== -1 && b > a) return JSON.parse(s.slice(a, b + 1));
+    throw new Error("response was not valid JSON");
+  }
+  async function analyzeWithLLM(text, cfg) {
+    const c = cleanInput(text);
+    // Default: call the built-in server proxy (key held server-side, nothing
+    // secret in the browser). Override: if the user pasted their own endpoint
+    // AND key, call that directly instead.
+    const direct = !!(cfg.endpoint && cfg.key);
+    const modelLabel = cfg.model || "LLM";
+    let res;
+
+    if (direct) {
+      const messages = [{ role: "system", content: AI_SYSTEM }, { role: "user", content: aiUserPrompt(text) }];
+      const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + cfg.key, "X-Title": "AI Review Discovery Engine" };
+      try { if (typeof location !== "undefined" && location.origin && location.origin.indexOf("http") === 0) headers["HTTP-Referer"] = location.origin; } catch (e) {}
+      const postOnce = (useJsonMode) => {
+        const body = { model: cfg.model, temperature: 0.2, messages: messages };
+        if (useJsonMode) body.response_format = { type: "json_object" };
+        return fetch(cfg.endpoint, { method: "POST", headers: headers, body: JSON.stringify(body) });
+      };
+      // Many free models reject response_format with a 400/422 — retry once without it.
+      res = await postOnce(true);
+      if (!res.ok && (res.status === 400 || res.status === 422)) res = await postOnce(false);
+    } else {
+      // Server proxy: key never leaves the server; JSON-mode retry handled there.
+      res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews: text, model: cfg.model || undefined })
+      });
+    }
+
+    if (!res.ok) {
+      let extra = "";
+      try { const j = await res.json(); extra = j && j.error && j.error.message ? " – " + j.error.message : ""; } catch (e) {}
+      if (!direct && res.status === 404) throw new Error("AI service not found — deploy the api/analyze function (or paste your own key to test directly)");
+      throw new Error("HTTP " + res.status + extra);
+    }
+    const data = await res.json();
+    const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    if (!content) throw new Error("empty response from AI service");
+    return normalizeAI(parseJSONLoose(content), c, text, modelLabel);
+  }
+  function normalizeAI(p, c, text, model) {
+    const denom = Math.max(1, c.analysed.length);
+    const themes = (p.themes || []).map(t => {
+      const mentions = Number(t.mentions) || 0;
+      return { name: t.name || "Theme", mentions, hits: mentions,
+        share: t.share != null ? Number(t.share) : Math.round((mentions / denom) * 100),
+        polarity: (t.type === "pain" || t.type === "praise") ? t.type : "neutral", evidence: t.evidence || "" };
+    }).sort((a, b) => b.mentions - a.mentions);
+    const other = (p.other || []).map(o => ({ name: o.name || "Other", mentions: Number(o.mentions) || 0, desc: o.desc || "", share: 0 }));
+    return {
+      mode: "ai", model: model,
+      reviewCount: c.detectedCount, analysedCount: c.analysed.length, totalWords: getTotalWordCount(text),
+      duplicatesRemoved: c.duplicatesRemoved, nonLatinFlagged: c.nonLatinFlagged,
+      categorised: null, uncategorised: null,
+      smallSample: c.analysed.length > 0 && c.analysed.length < SMALL_SAMPLE,
+      themes,
+      goals: (p.goals || []).map(g => ({ title: g.title || g.name || "Goal", desc: g.desc || "", support: [], strength: 0 })),
+      pains: (p.painPoints || p.pains || []).map(x => ({ title: x.title || x.name || "Pain point", desc: x.desc || "" })),
+      segments: (p.segments || []).map(s => ({ name: s.name || "Segment", share: Number(s.share) || 0, desc: s.desc || "", hits: 0 })),
+      opps: (p.opportunities || p.opps || []).map(o => ({ title: o.title || o.name || "Opportunity", desc: o.desc || "" })),
+      other, praise: themes.filter(t => t.polarity === "praise").map(t => t.name),
+      summary: p.summary || null, fallbackNote: null
+    };
+  }
+
+  /* ---- Render helpers ---- */
+  function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function strengthBadge(v, strongAt, modAt) {
+    if (v >= strongAt) return { cls: "badge strong", label: "Strong" };
+    if (v >= modAt) return { cls: "badge mod", label: "Moderate" };
+    return { cls: "badge", label: "Emerging" };
+  }
+  function shareLabel(a, share) { return (a.smallSample ? "~" : "") + share + "%"; }
+
+  const EQ_PATTERN = [0.5, 0.95, 0.6, 1, 0.45, 0.8, 0.55];
+  function buildEQ(share, maxShare) {
+    const eq = el("div", "eq");
+    const scale = 0.4 + 0.6 * (share / Math.max(1, maxShare));
+    EQ_PATTERN.forEach(p => { const i = el("i"); i.style.height = Math.max(16, Math.round(p * scale * 100)) + "%"; eq.appendChild(i); });
+    return eq;
+  }
+  function wave(n, lo, hi) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const s = Math.abs(Math.sin(i * 0.7) + 0.55 * Math.sin(i * 0.23 + 1) + 0.35 * Math.sin(i * 1.7));
+      out.push(lo + (hi - lo) * Math.min(1, s / 1.7));
+    }
+    return out;
+  }
+
+  /* ---- Render ---- */
+  function renderResults(a) {
+    const ai = a.mode === "ai";
+
+    els.tag.textContent = ai ? ("AI analysis · " + (a.model || "LLM")) : "Prototype analysis · rule-based (transparent)";
+    els.disclaimer.textContent = ai
+      ? "AI analysis. These reviews were sent to your AI service (a secure server proxy by default, or your own endpoint if configured); the themes are model-generated — emergent, not from a fixed list. Mentions and shares are directional, especially on small samples."
+      : "Simulated, rule-based analysis — no LLM or backend. Word-boundary keyword matching with negation and sentiment handling runs locally in your browser. Pain points exclude praise; the off-thesis bucket surfaces feedback the theme list never anticipated. Switch to AI mode for emergent themes.";
+
+    // transport
+    const catFill = (a.categorised != null && a.analysedCount) ? Math.round((a.categorised / a.analysedCount) * 100) : 100;
+    els.scrubFill.style.width = catFill + "%";
+    els.scrubKnob.style.left = catFill + "%";
+    els.tStats.replaceChildren();
+    const stat = (v, lbl) => { const b = el("b", null, v); els.tStats.appendChild(b); els.tStats.appendChild(document.createTextNode(" " + lbl)); };
+    stat(pad(a.reviewCount), "reviews"); els.tStats.appendChild(document.createTextNode(" · "));
+    stat(a.totalWords.toLocaleString(), "words"); els.tStats.appendChild(document.createTextNode(" · "));
+    stat(pad(a.themes.length), "themes"); els.tStats.appendChild(document.createTextNode(" · "));
+    if (ai) { els.tStats.appendChild(el("b", null, "AI")); els.tStats.appendChild(document.createTextNode(" " + (a.model || "LLM"))); }
+    else stat(a.categorised + "/" + a.analysedCount, "categorised");
+
+    // fallback / summary
+    if (a.fallbackNote) { els.fallback.hidden = false; els.fallback.replaceChildren(el("b", null, "Heads up: "), document.createTextNode(a.fallbackNote)); }
+    else els.fallback.hidden = true;
+    if (a.summary) { els.summaryLine.hidden = false; els.summaryLine.replaceChildren(el("b", null, "Summary: "), document.createTextNode(a.summary)); }
+    else els.summaryLine.hidden = true;
+
+    // clean note
+    els.cleanNote.replaceChildren(el("b", null, "Input cleaning: "), document.createTextNode([
+      a.reviewCount + " unique review" + (a.reviewCount === 1 ? "" : "s") + " detected",
+      a.analysedCount + " analysed",
+      a.duplicatesRemoved + " duplicate" + (a.duplicatesRemoved === 1 ? "" : "s") + " removed",
+      a.nonLatinFlagged + " non-English flagged" + (a.nonLatinFlagged ? " (skipped)" : "")
+    ].join(" · ")));
+
+    // sample note
+    if (a.smallSample) { els.sampleNote.hidden = false; els.sampleNote.replaceChildren(el("b", null, "Small sample: "), document.createTextNode("only " + a.analysedCount + " reviews analysed — percentages are directional, not statistically robust. Paste a few hundred reviews for meaningful rates.")); }
+    else els.sampleNote.hidden = true;
+
+    // theme queue
+    els.themesSub.textContent = ai ? "Emergent themes from the model · mentions = reviews" : ("Top themes · share of analysed reviews" + (a.smallSample ? " (directional)" : ""));
+    els.queue.replaceChildren();
+    const maxShare = Math.max(1, ...a.themes.map(t => t.share));
+    if (!a.themes.length) {
+      els.queue.appendChild(el("div", "empty-note", "No recognizable themes detected in this text."));
+    } else {
+      a.themes.forEach(t => {
+        const row = el("div", "q");
+        row.appendChild(buildEQ(t.share, maxShare));
+        const main = el("div", "q-main");
+        const name = el("span", "q-name", t.name);
+        const polTxt = t.polarity === "praise" ? "praise" : (t.polarity === "pain" ? "pain" : "neutral");
+        name.appendChild(el("span", "pol " + (t.polarity || "neutral"), polTxt));
+        main.appendChild(name);
+        if (t.evidence) main.appendChild(el("div", "q-sub", t.evidence));
+        row.appendChild(main);
+        const meta = el("div", "q-meta");
+        meta.appendChild(el("b", null, t.mentions + (t.mentions === 1 ? " rev" : " revs")));
+        meta.appendChild(document.createTextNode(" · " + shareLabel(a, t.share) + (ai ? "" : " · " + t.hits + " hits")));
+        row.appendChild(meta);
+        els.queue.appendChild(row);
+      });
+    }
+    if (a.praise && a.praise.length) { els.bright.hidden = false; els.bright.replaceChildren(el("b", null, "Bright spots: "), document.createTextNode(a.praise.join(", ") + " — mentioned positively, so excluded from pain points.")); }
+    else els.bright.hidden = true;
+
+    // goals
+    els.goalsBody.replaceChildren();
+    if (!a.goals.length) els.goalsBody.appendChild(el("li")).appendChild(el("div", "empty-note", "No clear user goals inferred."));
+    else a.goals.forEach(g => {
+      const li = el("li");
+      li.appendChild(el("span", "ic", "›"));
+      const body = el("div", "body"); body.appendChild(el("div", "t", g.title)); body.appendChild(el("div", "d", g.desc)); li.appendChild(body);
+      if (!ai) { const bd = strengthBadge(g.strength, 4, 2); li.appendChild(el("span", bd.cls, bd.label)); }
+      els.goalsBody.appendChild(li);
+    });
+
+    // pains
+    els.painsBody.replaceChildren();
+    if (!a.pains.length) els.painsBody.appendChild(el("li")).appendChild(el("div", "empty-note", "No negative-sentiment pain points detected."));
+    else a.pains.forEach(p => {
+      const li = el("li");
+      li.appendChild(el("span", "ic", "!"));
+      const body = el("div", "body"); body.appendChild(el("div", "t", p.title)); body.appendChild(el("div", "d", p.desc)); li.appendChild(body);
+      els.painsBody.appendChild(li);
+    });
+
+    // segments
+    els.segsBody.replaceChildren();
+    if (!a.segments.length) {
+      els.segsBody.appendChild(el("div", "empty-note", "No listener segment signals detected."));
+    } else {
+      a.segments.forEach(s => {
+        const block = el("div", "seg-row");
+        const top = el("div", "seg-top");
+        top.appendChild(el("span", "n", s.name));
+        top.appendChild(el("span", "p", shareLabel(a, s.share) + " signal share"));
+        block.appendChild(top);
+        if (s.desc) block.appendChild(el("div", "seg-desc", s.desc));
+        const bar = el("div", "sbar"); const span = el("span"); span.style.width = Math.max(4, Math.min(100, s.share)) + "%"; bar.appendChild(span); block.appendChild(bar);
+        els.segsBody.appendChild(block);
+      });
+      els.segsBody.appendChild(el("div", "seg-note", "Segment vocabulary overlaps with theme vocabulary, so shares are directional — one verbose reviewer can skew them."));
+    }
+
+    // opportunities
+    els.oppsBody.replaceChildren();
+    if (!a.opps.length) els.oppsBody.appendChild(el("li")).appendChild(el("div", "empty-note", "No opportunity areas generated."));
+    else a.opps.forEach(o => {
+      const li = el("li");
+      li.appendChild(el("span", "ic good", "✦"));
+      const body = el("div", "body"); body.appendChild(el("div", "t", o.title)); body.appendChild(el("div", "d", o.desc)); li.appendChild(body);
+      els.oppsBody.appendChild(li);
+    });
+
+    // other / off-thesis + uncategorised
+    els.otherBody.replaceChildren();
+    const hasOther = a.other && a.other.length;
+    if (hasOther) a.other.forEach(o => {
+      const li = el("li");
+      li.appendChild(el("span", "ic warn", "•"));
+      const body = el("div", "body"); body.appendChild(el("div", "t", o.name)); if (o.desc) body.appendChild(el("div", "d", o.desc)); li.appendChild(body);
+      li.appendChild(el("span", "badge", o.mentions + (o.mentions === 1 ? " rev" : " revs")));
+      els.otherBody.appendChild(li);
+    });
+    if (a.uncategorised != null && a.uncategorised > 0) {
+      const li = el("li");
+      li.appendChild(el("span", "ic warn", "?"));
+      const body = el("div", "body"); body.appendChild(el("div", "t", "Uncategorised reviews")); body.appendChild(el("div", "d", "Matched no known theme or off-thesis pattern — this is exactly where emergent issues hide. Switch to AI mode to surface them.")); li.appendChild(body);
+      li.appendChild(el("span", "badge", a.uncategorised + (a.uncategorised === 1 ? " rev" : " revs")));
+      els.otherBody.appendChild(li);
+    }
+    if (!hasOther && !(a.uncategorised > 0)) els.otherBody.appendChild(el("li")).appendChild(el("div", "empty-note", "No off-thesis or uncategorised feedback — every analysed review mapped to a discovery theme."));
+
+    els.results.hidden = false;
+  }
+
+  /* ---- Busy ---- */
+  function setBusy(on) {
+    els.demo.disabled = on;
+    if (on) {
+      els.analyze.disabled = true;
+      els.analyze.replaceChildren(el("span", "spin"), document.createTextNode("Analyzing with AI…"));
+      els.results.setAttribute("aria-busy", "true");
+    } else {
+      els.analyze.replaceChildren(document.createTextNode("Analyze Reviews"));
+      els.demo.disabled = false;
+      els.results.removeAttribute("aria-busy");
+      updateLiveStatus();
+    }
+  }
+
+  /* ---- Actions ---- */
+  async function runAnalyze() {
+    const text = els.textarea.value;
+    hideError();
+    const v = validateInput(text);
+    if (!v.valid) { showError(v.message, v.detail); updateLiveStatus(); els.textarea.focus(); return; }
+
+    if (currentMode() === "ai") {
+      const cfg = getAIConfig();
+      setBusy(true);
+      try {
+        const a = await analyzeWithLLM(text, cfg);
+        lastAnalysis = a; renderResults(a);
+      } catch (err) {
+        const a = analyzeKeyword(text);
+        a.fallbackNote = ((err && err.message) || "AI analysis unavailable") + " — showing the transparent keyword analysis instead.";
+        lastAnalysis = a; renderResults(a);
+      } finally {
+        setBusy(false);
+        els.results.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      return;
+    }
+
+    const a = analyzeKeyword(text);
+    lastAnalysis = a; renderResults(a); hideError(); updateLiveStatus();
+    els.results.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function runDemo() {
+    const sample = [
+      "App Store ★★☆☆☆ — The recommendations feel so repetitive. I keep hearing the same songs and the same artists over and over, and it never feels fresh anymore.",
+      "Play Store ��★★☆☆ — Discovery takes way too much effort. I have to search manually to find anything new, and it is genuinely hard to find hidden gems on my own.",
+      "Reddit r/music — My daily mix is basically the same playlist every single day. I am bored of it. Nothing new ever shows up and the whole thing feels stale and predictable.",
+      "Community forum — Everything it suggests is mainstream and trending. I only get popular songs and the same popular artists, but where are the underrated tracks and niche stuff?",
+      "App Store ★★☆☆☆ — The vibe is always wrong. When I work out or study the music does not match my mood at all. I really want mood based recommendations for each activity.",
+      "Social comment — I just want effortless listening that surfaces fresh music and more variety. Give me something different to explore without doing all of the work myself.",
+      "App Store ★★★★★ — Honestly lately the discovery has been great. So much variety, and I keep finding hidden gems that I genuinely love. Really impressed.",
+      "Play Store — To be fair, the recommendations are not repetitive anymore and the daily mix never feels stale now. It actually changes.",
+      "Reddit — Way too many ads between songs, and honestly the premium subscription is getting too expensive for what it is. Almost cancelled."
+    ].join("\n\n");
+    els.textarea.value = sample;
+    updateLiveStatus();
+    runAnalyze();
+  }
+
+  function clearAll() {
+    els.textarea.value = "";
+    lastAnalysis = null;
+    hideError();
+    hideResults();
+    updateLiveStatus();
+    els.textarea.focus();
+  }
+
+  function downloadInsights() {
+    const a = lastAnalysis;
+    if (!a) return;
+    const L = [];
+    L.push("AI REVIEW DISCOVERY ENGINE — INSIGHTS");
+    L.push(a.mode === "ai" ? ("Mode: AI analysis via " + (a.model || "LLM")) : "Mode: rule-based keyword analysis (transparent, local, no LLM)");
+    L.push("=".repeat(54)); L.push("");
+    if (a.summary) { L.push("SUMMARY"); L.push("  " + a.summary); L.push(""); }
+    L.push("INPUT CLEANING");
+    L.push("  Unique reviews detected : " + a.reviewCount);
+    L.push("  Reviews analysed        : " + a.analysedCount);
+    L.push("  Duplicates removed      : " + a.duplicatesRemoved);
+    L.push("  Non-English flagged     : " + a.nonLatinFlagged);
+    if (a.smallSample) L.push("  NOTE: small sample — percentages are directional.");
+    L.push("");
+    L.push("REVIEW SUMMARY");
+    L.push("  Words analyzed  : " + a.totalWords);
+    L.push("  Themes surfaced : " + a.themes.length);
+    if (a.categorised != null) L.push("  Reviews categorised : " + a.categorised + " / " + a.analysedCount);
+    L.push("");
+    L.push("TOP THEMES");
+    if (a.themes.length) a.themes.forEach(t => L.push("  - [" + (t.polarity || "neutral") + "] " + t.name + " — " + t.mentions + " reviews · " + (a.smallSample ? "~" : "") + t.share + "%"));
+    else L.push("  (none)");
+    L.push(""); L.push("USER GOALS");
+    if (a.goals.length) a.goals.forEach(g => L.push("  - " + g.title + " — " + g.desc)); else L.push("  (none)");
+    L.push(""); L.push("PAIN POINTS (negative sentiment only)");
+    if (a.pains.length) a.pains.forEach(p => L.push("  - " + p.title + " — " + p.desc)); else L.push("  (none)");
+    L.push(""); L.push("SEGMENT SIGNALS (signal share, not % of listeners)");
+    if (a.segments.length) a.segments.forEach(s => L.push("  - " + s.name + " — " + (a.smallSample ? "~" : "") + s.share + "% signal share")); else L.push("  (none)");
+    L.push(""); L.push("OPPORTUNITY AREAS");
+    if (a.opps.length) a.opps.forEach(o => L.push("  - " + o.title + " — " + o.desc)); else L.push("  (none)");
+    L.push(""); L.push("OTHER / OFF-THESIS");
+    if (a.other && a.other.length) a.other.forEach(o => L.push("  - " + o.name + " — " + o.mentions + " reviews"));
+    if (a.uncategorised != null && a.uncategorised > 0) L.push("  - Uncategorised (matched nothing) — " + a.uncategorised + " reviews");
+    if (!(a.other && a.other.length) && !(a.uncategorised > 0)) L.push("  (none)");
+    if (a.praise && a.praise.length) { L.push(""); L.push("BRIGHT SPOTS (praise, excluded from pains): " + a.praise.join(", ")); }
+    L.push(""); L.push("Generated locally in your browser.");
+
+    const blob = new Blob([L.join("\n")], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = "review-discovery-insights.txt";
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  /* ---- Hero waveform ---- */
+  (function buildHeroWave() {
+    wave(64, 6, 64).forEach(h => { const b = el("i"); b.style.height = h + "px"; els.heroWave.appendChild(b); });
+  })();
+
+  /* ---- Wiring ---- */
+  els.textarea.addEventListener("input", updateLiveStatus);
+  els.analyze.addEventListener("click", runAnalyze);
+  els.demo.addEventListener("click", runDemo);
+  els.clear.addEventListener("click", clearAll);
+  els.download.addEventListener("click", downloadInsights);
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener("change", () => { els.aiConfig.hidden = currentMode() !== "ai"; }));
+  els.textarea.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !els.analyze.disabled) { e.preventDefault(); runAnalyze(); } });
+
+  updateLiveStatus();
+  </script>
+</body>
+</html>
