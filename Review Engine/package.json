@@ -1,0 +1,12 @@
+{
+  "name": "review-engine",
+  "version": "1.0.0",
+  "description": "AI Review Discovery Engine",
+  "private": true,
+  "dependencies": {
+    "@vercel/analytics": "^1.4.1"
+  },
+  "scripts": {
+    "build": "echo 'Static HTML project - no build step required'"
+  }
+}
