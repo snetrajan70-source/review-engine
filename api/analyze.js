@@ -1,12 +1,21 @@
 // ============================================================
 //  /api/analyze  —  Vercel serverless function (Node.js 18+)
-//  Key stays SERVER-SIDE. Set OPENROUTER_API_KEY in Vercel →
-//  Settings → Environment Variables, then REDEPLOY.
+//
+//  Holds the OpenRouter API key SERVER-SIDE so it never appears in
+//  the public page. The browser POSTs { reviews, model } here; this
+//  function injects the key, calls OpenRouter, and returns the raw
+//  chat-completions response for the client to parse.
+//
+//  Required environment variable (set in Vercel → Project → Settings
+//  → Environment Variables):
+//      OPENROUTER_API_KEY = sk-or-v1-...
+//  Optional:
+//      OPENROUTER_MODEL   = meta-llama/llama-3.3-70b-instruct:free
 // ============================================================
 "use strict";
 
 const DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
-const MAX_REVIEW_CHARS = 24000;
+const MAX_REVIEW_CHARS = 24000; // guard against oversized / abusive prompts
 
 const SYSTEM_PROMPT =
   "You are a senior product analyst for a music streaming app. You analyze raw user reviews and surface EMERGENT themes grounded only in the text provided. Do not invent feedback. Detect sentiment so praise is not reported as a pain point. Capture issues that fall OUTSIDE music discovery (pricing, ads, bugs, account, performance, audio quality, or anything else) in an 'other' array so nothing is forced into a discovery narrative. Respond with a single JSON object only.";
@@ -30,6 +39,7 @@ function userPrompt(reviews) {
   ].join("\n");
 }
 
+// Read the request body whether Vercel pre-parsed it or not.
 function readBody(req) {
   return new Promise((resolve) => {
     if (req.body !== undefined && req.body !== null) { resolve(req.body); return; }
@@ -41,28 +51,14 @@ function readBody(req) {
 }
 
 module.exports = async function handler(req, res) {
-  const key = process.env.OPENROUTER_API_KEY;
-  const model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
-
-  // GET → health check. Visit the URL in a browser to confirm it's live + keyed.
-  if (req.method === "GET") {
-    res.status(200).json({
-      ok: true,
-      service: "AI Review Discovery Engine proxy",
-      keyConfigured: !!key,
-      model,
-      hint: "keyConfigured:false means OPENROUTER_API_KEY is missing for this deployment. POST { reviews } here to analyze."
-    });
-    return;
-  }
-
   if (req.method !== "POST") {
-    res.status(405).json({ error: { message: "Method not allowed — use GET for health or POST to analyze." } });
+    res.status(405).json({ error: { message: "Method not allowed — use POST." } });
     return;
   }
 
+  const key = process.env.OPENROUTER_API_KEY;
   if (!key) {
-    res.status(500).json({ error: { message: "Server is missing OPENROUTER_API_KEY. Set it in Vercel → Settings → Environment Variables and redeploy." } });
+    res.status(500).json({ error: { message: "Server is missing OPENROUTER_API_KEY. Set it in your Vercel project's Environment Variables and redeploy." } });
     return;
   }
 
@@ -78,8 +74,10 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    let useModel = (body.model || "").toString().trim();
-    if (!useModel.endsWith(":free")) useModel = model;
+    // Only honor a client-supplied model if it is a free model; otherwise use
+    // the server's configured (or default) model. Caps cost from public traffic.
+    let model = (body.model || "").toString().trim();
+    if (!model.endsWith(":free")) model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
 
     const messages = [
       { role: "system", content: SYSTEM_PROMPT },
@@ -87,7 +85,7 @@ module.exports = async function handler(req, res) {
     ];
 
     const callOpenRouter = (useJsonMode) => {
-      const payload = { model: useModel, temperature: 0.2, max_tokens: 1500, messages };
+      const payload = { model: model, temperature: 0.2, max_tokens: 1500, messages: messages };
       if (useJsonMode) payload.response_format = { type: "json_object" };
       return fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -100,6 +98,7 @@ module.exports = async function handler(req, res) {
       });
     };
 
+    // Try JSON mode; many free models reject response_format — retry without it.
     let r = await callOpenRouter(true);
     if (!r.ok && (r.status === 400 || r.status === 422)) r = await callOpenRouter(false);
 
