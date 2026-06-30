@@ -1,9 +1,7 @@
 // ============================================================
 //  /api/analyze  —  Vercel serverless function (Node.js 18+)
-//  Holds the OpenRouter API key SERVER-SIDE.
-//  Env var (Vercel → Settings → Environment Variables):
-//      OPENROUTER_API_KEY = sk-or-v1-...
-//  Optional: OPENROUTER_MODEL = meta-llama/llama-3.3-70b-instruct:free
+//  Key stays SERVER-SIDE. Set OPENROUTER_API_KEY in Vercel →
+//  Settings → Environment Variables, then REDEPLOY.
 // ============================================================
 "use strict";
 
@@ -43,19 +41,26 @@ function readBody(req) {
 }
 
 module.exports = async function handler(req, res) {
-  // GET (or any non-POST) is a health check — safe to open in a browser.
-  if (req.method !== "POST") {
+  const key = process.env.OPENROUTER_API_KEY;
+  const model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+
+  // GET → health check. Visit the URL in a browser to confirm it's live + keyed.
+  if (req.method === "GET") {
     res.status(200).json({
       ok: true,
       service: "AI Review Discovery Engine proxy",
-      keyConfigured: Boolean(process.env.OPENROUTER_API_KEY),
-      model: process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
+      keyConfigured: !!key,
+      model,
       hint: "keyConfigured:false means OPENROUTER_API_KEY is missing for this deployment. POST { reviews } here to analyze."
     });
     return;
   }
 
-  const key = process.env.OPENROUTER_API_KEY;
+  if (req.method !== "POST") {
+    res.status(405).json({ error: { message: "Method not allowed — use GET for health or POST to analyze." } });
+    return;
+  }
+
   if (!key) {
     res.status(500).json({ error: { message: "Server is missing OPENROUTER_API_KEY. Set it in Vercel → Settings → Environment Variables and redeploy." } });
     return;
@@ -73,8 +78,8 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    let model = (body.model || "").toString().trim();
-    if (!model.endsWith(":free")) model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+    let useModel = (body.model || "").toString().trim();
+    if (!useModel.endsWith(":free")) useModel = model;
 
     const messages = [
       { role: "system", content: SYSTEM_PROMPT },
@@ -82,7 +87,7 @@ module.exports = async function handler(req, res) {
     ];
 
     const callOpenRouter = (useJsonMode) => {
-      const payload = { model: model, temperature: 0.2, max_tokens: 1500, messages: messages };
+      const payload = { model: useModel, temperature: 0.2, max_tokens: 1500, messages };
       if (useJsonMode) payload.response_format = { type: "json_object" };
       return fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
